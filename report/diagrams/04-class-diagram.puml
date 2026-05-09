@@ -1,0 +1,169 @@
+@startuml Class Diagram - Data Models
+
+skinparam classBackgroundColor LightYellow
+skinparam classBorderColor DarkGoldenRod
+skinparam classArrowColor Navy
+skinparam classAttributeIconSize 0
+
+class User {
+  + id : INTEGER (SQLite PK)
+  + email : TEXT (UNIQUE)
+  + password : TEXT (bcrypt hash)
+  + createdAt : DATETIME
+  --
+  + register() : void
+  + login() : JWT
+}
+
+class Product {
+  + _id : String (PK)
+  + name : String
+  + category : String
+  + buyPrice : Number
+  + sellPrice : Number
+  + barcode : String
+  + supplierId : String (FK → Supplier)
+  + createdAt : Date
+  + updatedAt : Date
+  --
+  + create() : Product
+  + list() : Product[]
+  + search(name) : Product[]
+  + delete(id) : void
+}
+
+class Supplier {
+  + _id : String (PK)
+  + name : String
+  + contactPerson : String
+  + phone : String
+  + email : String
+  + address : String
+  + notes : String
+  + createdAt : Date
+  + updatedAt : Date
+  --
+  + create() : Supplier
+  + list() : Supplier[]
+  + delete(id) : void
+}
+
+class Customer {
+  + _id : String (PK)
+  + name : String
+  + contactPerson : String
+  + phone : String
+  + address : String
+  + notes : String
+  + createdAt : Date
+  + updatedAt : Date
+  --
+  + create() : Customer
+  + list() : Customer[]
+  + search(query) : Customer[]
+  + delete(id) : void
+}
+
+class Stock {
+  + _id : String (PK, batch ID)
+  + productId : String (FK → Product)
+  + supplierId : String (FK → Supplier)
+  + quantity : Number
+  + unitPrice : Number
+  + expiryDate : Date
+  + notes : String
+  + createdAt : Date
+  + updatedAt : Date
+  --
+  + create() : Stock
+  + list() : Stock[]
+  + getLowStock(threshold) : Stock[]
+  + getExpiringSoon(days) : Stock[]
+}
+
+class BillItem {
+  + productId : String (FK → Product)
+  + productName : String
+  + quantity : Number
+  + unitPrice : Number
+  + totalPrice : Number
+  + batchRefs : String[] (FK → Stock)
+}
+
+class CustomerBill {
+  + _id : String (PK, "inv_timestamp")
+  + customerId : String (FK → Customer)
+  + date : Date
+  + items : BillItem[]
+  + grandTotal : Number
+  + paymentStatus : String
+  + notes : String
+  + createdAt : Date
+  --
+  + create(data) : CustomerBill
+  + list() : CustomerBill[]
+}
+
+class SupplierBillItem {
+  + productId : String (FK → Product)
+  + productName : String
+  + quantity : Number
+  + unitPrice : Number
+  + totalPrice : Number
+  + batchId : String (FK → Stock)
+}
+
+class SupplierBill {
+  + _id : String (PK, "bill_timestamp")
+  + supplierId : String (FK → Supplier)
+  + date : Date
+  + items : SupplierBillItem[]
+  + grandTotal : Number
+  + paymentStatus : String
+  + notes : String
+  + createdAt : Date
+  --
+  + create(data) : SupplierBill
+  + list() : SupplierBill[]
+}
+
+class ReturnItem {
+  + productId : String (FK → Product)
+  + productName : String
+  + quantity : Number
+  + unitPrice : Number
+  + batchRef : String (FK → Stock)
+}
+
+class ReturnModel {
+  + _id : String (PK)
+  + type : Enum {customer, supplier}
+  + customerId : String (FK → Customer, optional)
+  + supplierId : String (FK → Supplier, optional)
+  + date : Date
+  + items : ReturnItem[]
+  + relatedInvoiceId : String (FK → CustomerBill, optional)
+  + relatedBillId : String (FK → SupplierBill, optional)
+  + refundAmount : Number
+  + notes : String
+  + createdAt : Date
+  --
+  + processCustomerReturn(data) : ReturnModel
+  + processSupplierReturn(data) : ReturnModel
+}
+
+' Relationships
+Supplier "1" --> "0..*" Product : supplies
+Supplier "1" --> "0..*" Stock : stocks
+Supplier "1" --> "0..*" SupplierBill : billed via
+Product "1" --> "0..*" Stock : stored as batches
+Customer "1" --> "0..*" CustomerBill : has
+CustomerBill "1" *-- "1..*" BillItem : contains
+SupplierBill "1" *-- "1..*" SupplierBillItem : contains
+ReturnModel "1" *-- "1..*" ReturnItem : contains
+CustomerBill "1" --> "0..*" ReturnModel : returned via
+SupplierBill "1" --> "0..*" ReturnModel : returned via
+BillItem "0..*" --> "1..*" Stock : references batches
+ReturnItem "0..*" --> "1" Stock : restores batch
+
+@enduml

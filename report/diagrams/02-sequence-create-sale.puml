@@ -1,0 +1,63 @@
+@startuml Sequence Diagram - Create Sale (FIFO)
+
+skinparam sequenceArrowThickness 2
+skinparam roundcorner 5
+skinparam sequenceParticipant underline
+
+actor "Manager" as MGR
+participant "React UI\n(SellToCustomer)" as UI
+participant "Express Server\n(POST /api/customer-bills/sell)" as API
+participant "JWT Middleware\n(verifyToken)" as AUTH
+participant "Transaction\nController\n(createSale)" as CTRL
+database "MongoDB\n(Stock, CustomerBill)" as DB
+
+== Authentication Check ==
+
+MGR -> UI : Fill sale form\n(customer, items with quantities)
+MGR -> UI : Click "Submit Sale"
+UI -> API : POST /api/customer-bills/sell\nAuthorization: Bearer <JWT>\nBody: { customerId, items: [{productId, qty}] }
+API -> AUTH : verifyToken(req)
+AUTH -> AUTH : Decode & verify JWT
+alt Token valid
+  AUTH --> API : req.user = decoded payload
+else Token invalid or expired
+  AUTH --> API : 403 Forbidden
+  API --> UI : 403 Forbidden
+  UI --> MGR : Show error "Session expired"
+end
+
+== FIFO Stock Deduction ==
+
+API -> CTRL : createSale(req, res)
+loop For each item in request
+  CTRL -> DB : Stock.find({ productId })\n.sort({ expiryDate: 1 }) [FIFO]
+  DB --> CTRL : batches[] sorted oldest-first
+  CTRL -> CTRL : remaining = requested quantity
+  loop While remaining > 0 AND batches available
+    CTRL -> CTRL : deduct = min(batch.quantity, remaining)
+    CTRL -> CTRL : remaining -= deduct\nbatch.quantity -= deduct\nbatch._batchRef = batch._id
+    alt batch.quantity == 0
+      CTRL -> DB : Stock.deleteOne({ _id: batch._id })
+      DB --> CTRL : batch deleted
+    else batch.quantity > 0
+      CTRL -> DB : batch.save()
+      DB --> CTRL : batch updated
+    end
+  end
+  alt remaining > 0
+    CTRL --> API : Insufficient stock error
+    API --> UI : 400 Bad Request\n{ error: "Insufficient stock" }
+    UI --> MGR : Show error message
+  end
+end
+
+== Invoice Creation ==
+
+CTRL -> CTRL : Calculate grandTotal\n= Σ (qty × sellPrice)
+CTRL -> DB : CustomerBill.create({\n  customerId,\n  items (with batchRefs),\n  grandTotal,\n  date: now\n})
+DB --> CTRL : savedBill
+CTRL --> API : 201 Created\n{ bill: savedBill }
+API --> UI : 201 Created\n{ bill }
+UI --> MGR : Show success\n"Invoice created: inv_XXXX"
+
+@enduml

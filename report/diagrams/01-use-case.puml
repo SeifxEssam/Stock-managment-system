@@ -1,0 +1,123 @@
+@startuml Use Case Diagram - Stock Management System
+
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor LightYellow
+  BorderColor DarkGoldenRod
+  ArrowColor DarkGoldenRod
+}
+skinparam actor {
+  BackgroundColor LightBlue
+  BorderColor Navy
+}
+
+left to right direction
+
+actor "Manager" as MGR
+
+rectangle "Stock Management System" {
+
+  package "Authentication" {
+    usecase "Register Account" as UC_REG
+    usecase "Login" as UC_LOGIN
+    usecase "Logout" as UC_LOGOUT
+  }
+
+  package "Product Management" {
+    usecase "Add Product" as UC_AP
+    usecase "View Product List" as UC_VP
+    usecase "Search Product" as UC_SP
+    usecase "Delete Product" as UC_DP
+  }
+
+  package "Supplier Management" {
+    usecase "Add Supplier" as UC_AS
+    usecase "View Suppliers" as UC_VS
+    usecase "Delete Supplier" as UC_DS
+  }
+
+  package "Customer Management" {
+    usecase "Add Customer" as UC_AC
+    usecase "View Customers" as UC_VC
+    usecase "Search Customer" as UC_SC
+    usecase "Delete Customer" as UC_DC
+  }
+
+  package "Inventory Management" {
+    usecase "Add Stock Batch" as UC_ASB
+    usecase "View Stock Batches" as UC_VSB
+    usecase "View Low-Stock Alerts" as UC_LSA
+    usecase "View Expiring-Soon Alerts" as UC_ESA
+  }
+
+  package "Transactions" {
+    usecase "Create Sale Invoice" as UC_SALE
+    usecase "Record Purchase Bill" as UC_BUY
+    usecase "Process Customer Return" as UC_CR
+    usecase "Process Supplier Return" as UC_SR
+    usecase "View Sales History" as UC_SH
+    usecase "View Purchase History" as UC_PH
+  }
+
+  package "Dashboard & Reports" {
+    usecase "View Profit Statistics" as UC_PS
+    usecase "View Monthly Profit Chart" as UC_MPC
+  }
+
+  package "Settings" {
+    usecase "Switch Language (EN/AR)" as UC_LANG
+  }
+}
+
+MGR --> UC_REG
+MGR --> UC_LOGIN
+MGR --> UC_LOGOUT
+
+MGR --> UC_AP
+MGR --> UC_VP
+MGR --> UC_SP
+MGR --> UC_DP
+
+MGR --> UC_AS
+MGR --> UC_VS
+MGR --> UC_DS
+
+MGR --> UC_AC
+MGR --> UC_VC
+MGR --> UC_SC
+MGR --> UC_DC
+
+MGR --> UC_ASB
+MGR --> UC_VSB
+MGR --> UC_LSA
+MGR --> UC_ESA
+
+MGR --> UC_SALE
+MGR --> UC_BUY
+MGR --> UC_CR
+MGR --> UC_SR
+MGR --> UC_SH
+MGR --> UC_PH
+
+MGR --> UC_PS
+MGR --> UC_MPC
+
+MGR --> UC_LANG
+
+UC_SALE ..> UC_LOGIN : <<include>>
+UC_BUY ..> UC_LOGIN : <<include>>
+UC_AP ..> UC_LOGIN : <<include>>
+UC_ASB ..> UC_LOGIN : <<include>>
+
+note right of UC_SALE
+  FIFO: deducts stock
+  from oldest batch first
+end note
+
+note right of UC_ASB
+  Each batch has
+  expiry date & quantity
+end note
+
+@enduml

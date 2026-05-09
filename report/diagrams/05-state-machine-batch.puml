@@ -1,0 +1,67 @@
+@startuml State Machine Diagram - Stock Batch Lifecycle
+
+skinparam state {
+  BackgroundColor LightYellow
+  BorderColor DarkGoldenRod
+  ArrowColor Navy
+  StartColor DarkGreen
+  EndColor DarkRed
+}
+
+[*] --> Created : Manager records purchase batch
+
+state "Created" as Created
+state "In Stock" as InStock
+state "Low Stock\n(qty ≤ 20)" as LowStock
+state "Expiring Soon\n(expiry ≤ today + 30d)" as ExpiringSoon
+state "Depleted\n(auto-deleted)" as Depleted
+state "Restored\n(customer return)" as RestoredFromReturn
+state "Reduced\n(supplier return)" as ReducedBySupplierReturn
+
+Created --> InStock : Saved to MongoDB\n(createPurchase)
+
+InStock --> LowStock : quantity drops\nbelow 20 after sale
+InStock --> ExpiringSoon : expiryDate ≤\ntoday + 30 days
+InStock --> Depleted : quantity == 0\nafter sale (FIFO)
+
+LowStock --> ExpiringSoon : expiryDate ≤\ntoday + 30 days
+LowStock --> Depleted : quantity == 0\nafter sale (FIFO)
+
+ExpiringSoon --> LowStock : quantity drops\nbelow 20 after sale
+ExpiringSoon --> Depleted : quantity == 0\nafter sale (FIFO)
+
+Depleted --> [*] : Batch document deleted
+
+InStock --> RestoredFromReturn : customer return processed
+LowStock --> RestoredFromReturn : customer return processed
+ExpiringSoon --> RestoredFromReturn : customer return processed
+
+RestoredFromReturn --> InStock : quantity > 20
+RestoredFromReturn --> LowStock : quantity ≤ 20
+
+InStock --> ReducedBySupplierReturn : supplier return processed
+LowStock --> ReducedBySupplierReturn : supplier return processed
+
+ReducedBySupplierReturn --> InStock : quantity > 20
+ReducedBySupplierReturn --> LowStock : 0 < quantity ≤ 20
+ReducedBySupplierReturn --> Depleted : quantity == 0
+
+note right of InStock
+  Normal operating state.
+  Stock is sufficient
+  and not near expiry.
+end note
+
+note right of LowStock
+  Alert threshold: 20 units.
+  Manager should reorder
+  from supplier.
+end note
+
+note right of Depleted
+  Batch is automatically
+  deleted — no zero-quantity
+  batches kept in DB.
+end note
+
+@enduml

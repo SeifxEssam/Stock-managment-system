@@ -1,0 +1,82 @@
+@startuml Activity Diagram - Sales Transaction Flow
+
+skinparam activityBackgroundColor LightYellow
+skinparam activityBorderColor DarkGoldenRod
+skinparam activityArrowColor DarkGoldenRod
+skinparam activityStartColor DarkGreen
+skinparam activityEndColor DarkRed
+skinparam swimlane {
+  BorderColor Navy
+  TitleFontColor Navy
+}
+
+|Manager (Browser)|
+start
+
+:Open "Sell to Customer" page;
+:Select Customer from dropdown;
+:Add product line items\n(Product + Quantity);
+:Click "Submit Sale";
+
+|Express API (Backend)|
+
+:Receive POST /api/customer-bills/sell;
+:Verify JWT Token;
+
+if (Token valid?) then (yes)
+else (no)
+  :Return 401/403 Error;
+  stop
+end if
+
+:Begin processing items;
+
+|MongoDB (Database)|
+
+repeat
+  :Fetch stock batches for product\nsorted by expiryDate ASC (FIFO);
+
+  |Express API (Backend)|
+
+  :Set remaining = requested quantity;
+
+  repeat
+    if (remaining > 0 AND batches left?) then (yes)
+      :Deduct from oldest batch\n(deduct = min(batch.qty, remaining));
+      :remaining -= deduct\nbatch.qty -= deduct;
+
+      if (batch.qty == 0?) then (yes)
+        |MongoDB (Database)|
+        :Delete empty batch;
+        |Express API (Backend)|
+      else (no)
+        |MongoDB (Database)|
+        :Save updated batch;
+        |Express API (Backend)|
+      end if
+    else (no / insufficient stock)
+      :Return 400 error\n"Insufficient stock";
+
+      |Manager (Browser)|
+      :Display error message;
+      stop
+    end if
+  repeat while (remaining > 0?) is (yes)
+
+repeat while (more items?) is (yes)
+
+:Calculate grandTotal\n= Σ (qty × sellPrice);
+
+|MongoDB (Database)|
+:Create CustomerBill document\nwith items + batchRefs + grandTotal;
+
+|Express API (Backend)|
+:Return 201 Created\nwith invoice details;
+
+|Manager (Browser)|
+:Display success message\n"Invoice inv_XXXX created";
+:Invoice visible in Sales History;
+
+stop
+
+@enduml
